@@ -6,27 +6,44 @@ TcpFileServer::TcpFileServer(QWidget *parent)
     totalBytes = 0;
     byteReceived = 0;
     fileNameSize = 0;
+
     serverProgressBar = new QProgressBar;
-    serverStatusLabel = new QLabel(QStringLiteral("伺服器端就緒"));
-    startButton = new QPushButton(QStringLiteral("接收"));
-    quitButton = new QPushButton(QStringLiteral("退出"));
+    serverStatusLabel = new QLabel(tr("伺服器端就緒"));
+
+    // 新增 IP 和 PORT 输入框
+    ipInput = new QLineEdit;
+    ipInput->setPlaceholderText(tr("輸入IP地址，例如 127.0.0.1"));
+    portInput = new QLineEdit;
+    portInput->setPlaceholderText(tr("輸入端口，例如 16998"));
+
+    startButton = new QPushButton(tr("接收"));
+    quitButton = new QPushButton(tr("退出"));
     buttonBox = new QDialogButtonBox;
     buttonBox->addButton(startButton, QDialogButtonBox::ActionRole);
-    buttonBox->addButton(quitButton,QDialogButtonBox::RejectRole);
+    buttonBox->addButton(quitButton, QDialogButtonBox::RejectRole);
 
     QVBoxLayout *mainLayout = new QVBoxLayout;
     mainLayout->addWidget(serverProgressBar);
     mainLayout->addWidget(serverStatusLabel);
+
+    // 将 IP 和 PORT 输入框加入布局
+    mainLayout->addWidget(new QLabel(tr("IP 地址：")));
+    mainLayout->addWidget(ipInput);
+    mainLayout->addWidget(new QLabel(tr("端口：")));
+    mainLayout->addWidget(portInput);
+
     mainLayout->addStretch();
     mainLayout->addWidget(buttonBox);
     setLayout(mainLayout);
-    setWindowTitle(QStringLiteral("接收檔案"));
+    setWindowTitle(tr("接收檔案"));
+
     connect(startButton, SIGNAL(clicked()), this, SLOT(start()));
     connect(quitButton, SIGNAL(clicked()), this, SLOT(close()));
     connect(&tcpServer, SIGNAL(newConnection()), this, SLOT(acceptConnection()));
-    connect(&tcpServer, SIGNAL(acceptError(QAbstractSocket::SocketError)),this,
+    connect(&tcpServer, SIGNAL(acceptError(QAbstractSocket::SocketError)), this,
             SLOT(displayError(QAbstractSocket::SocketError)));
- }
+}
+
 
 TcpFileServer::~TcpFileServer()
 {
@@ -37,22 +54,33 @@ void TcpFileServer::start()
     startButton->setEnabled(false);
     byteReceived = 0;
     fileNameSize = 0;
-    while(!tcpServer.isListening() &&
-          !tcpServer.listen(QHostAddress::AnyIPv4, 16998))
+
+    // 获取 IP 和端口
+    QString ipAddress = ipInput->text().isEmpty() ? "127.0.0.1" : ipInput->text();
+    quint16 port = portInput->text().toUShort();
+
+    QHostAddress address;
+    if (!address.setAddress(ipAddress)) {
+        QMessageBox::warning(this, tr("無效的IP地址"), tr("請輸入有效的IP地址。"));
+        startButton->setEnabled(true);
+        return;
+    }
+
+    while(!tcpServer.isListening() && !tcpServer.listen(address, port))
     {
         QMessageBox::StandardButton ret = QMessageBox::critical(this,
-                                                                QStringLiteral("迴圈"),
-                                                                QStringLiteral("無法啟動伺服器: %1.").arg(tcpServer.errorString()),
+                                                                tr("迴圈"),
+                                                                tr("無法啟動伺服器: %1.").arg(tcpServer.errorString()),
                                                                 QMessageBox::Retry | QMessageBox::Cancel);
         if (ret == QMessageBox::Cancel)
-
         {
             startButton->setEnabled(true);
             return;
         }
     }
-    serverStatusLabel->setText(QStringLiteral("監聽中..."));
+    serverStatusLabel->setText(tr("監聽中..."));
 }
+
 
 void TcpFileServer::acceptConnection()
 {
